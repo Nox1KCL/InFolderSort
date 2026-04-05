@@ -1,0 +1,3 @@
+[rules]
+Images = [".jpg", ".png", ".gif"]
+Docs   = [".pdf", ".docx", ".txt"]
