@@ -3,9 +3,10 @@ package main
 import (
 	"flag"
 	"fmt"
-	"main/internal/config"
-	"main/internal/tui"
 	"os"
+
+	"github.com/Nox1KCL/InFolderSort/internal/config"
+	"github.com/Nox1KCL/InFolderSort/internal/tui"
 )
 
 func main() {

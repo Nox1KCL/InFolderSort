@@ -2,10 +2,11 @@ package files
 
 import (
 	"fmt"
-	"main/internal/config"
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/Nox1KCL/InFolderSort/internal/config"
 )
 
 func GetHomeDir() (string, error) {

@@ -3,11 +3,12 @@ package tui
 import (
 	"bufio"
 	"fmt"
-	"main/internal/config"
-	"main/internal/files"
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/Nox1KCL/InFolderSort/internal/config"
+	"github.com/Nox1KCL/InFolderSort/internal/files"
 )
 
 func Core(cfg *config.Config) error {
@@ -65,7 +66,7 @@ func askChoice(prompt string, validOptions ...string) string {
 	var input string
 	for {
 		fmt.Print(prompt)
-		fmt.Scanln(&input)
+		_, _ = fmt.Scanln(&input)
 		input = strings.TrimSpace(input)
 
 		for _, opt := range validOptions {

@@ -1,4 +1,4 @@
-module main
+module github.com/Nox1KCL/InFolderSort
 
 go 1.25.7
 
