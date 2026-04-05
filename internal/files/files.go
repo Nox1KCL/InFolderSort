@@ -9,6 +9,12 @@ import (
 	"github.com/Nox1KCL/InFolderSort/internal/config"
 )
 
+type SortResult struct {
+	Moved   []string
+	Skipped []string
+	Errors  []error
+}
+
 func GetHomeDir() (string, error) {
 	homeDir, err := os.UserHomeDir()
 	if err != nil {
@@ -32,45 +38,49 @@ func GetDownloadsPath() (string, error) {
 		}
 	}
 
-	return "", fmt.Errorf("downloads directory didn't found")
+	return "", fmt.Errorf("downloads directory not found")
 }
 
-// InDirSorting Func is sorting all files in a dir with base config
-func InDirSorting(targetPath string, cfg *config.Config) error {
-	entries, _ := os.ReadDir(targetPath) // Scan all dir
+// InDirSorting sorts all files in the target directory according to the provided config
+func InDirSorting(targetPath string, cfg *config.Config) (SortResult, error) {
+	var report SortResult
+
+	entries, err := os.ReadDir(targetPath)
+	if err != nil {
+		return report, fmt.Errorf("reading directory %q: %w", targetPath, err)
+	}
 
 	for _, entry := range entries {
 		fileName := entry.Name()
 		if !entry.IsDir() && !strings.HasPrefix(fileName, ".") {
 			fileExt := filepath.Ext(fileName)
-			targetFolder, err := TargetFolderName(cfg, fileExt) // Get a name of save folder
+			targetFolder, err := cfg.TargetFolderName(fileExt) // Get a name of save folder
 			if err != nil {
-				fmt.Printf("getting target folder name: %v", err)
+				report.Skipped = append(report.Skipped, entry.Name())
 				continue
 			}
 
 			finalPath := filepath.Join(targetPath, targetFolder) // Make a save path
-			err = os.MkdirAll(finalPath, 0755)                   // Make a directories by path
-			if err != nil {
-				return fmt.Errorf("creating dirs by path %q: %w", finalPath, err)
+			// Make the directories by path
+			if err := os.MkdirAll(finalPath, 0755); err != nil {
+				report.Errors = append(report.Errors,
+					fmt.Errorf("creating dirs by path %q: %w", finalPath, err),
+				)
+				continue
 			}
 
 			oldFilePath := filepath.Join(targetPath, fileName)
 			newFilePath := filepath.Join(finalPath, fileName)
 
-			err = os.Rename(oldFilePath, newFilePath)
-			if err != nil {
-				return err
+			if err := os.Rename(oldFilePath, newFilePath); err != nil {
+				report.Errors = append(report.Errors,
+					fmt.Errorf("moving file from %q to %q: %w", oldFilePath, newFilePath, err),
+				)
+				continue
 			}
+			report.Moved = append(report.Moved, entry.Name())
 		}
 	}
-	return nil
-}
 
-func TargetFolderName(cfg *config.Config, fileExt string) (string, error) {
-	targetFolder, ok := cfg.InvertedRules[fileExt]
-	if ok {
-		return targetFolder, nil
-	}
-	return "", fmt.Errorf("ext isn't in config: %s", fileExt)
+	return report, nil
 }

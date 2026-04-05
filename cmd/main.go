@@ -10,11 +10,11 @@ import (
 )
 
 func main() {
-	configPath := flag.String("config", "internal/config/config.toml", "Path to configuration file")
+	configPath := flag.String("config", "", "path to config file (uses embedded default if empty)")
 	flag.Parse()
-	actualPath := *configPath
+	actualConfigPath := *configPath
 
-	cfg, err := config.GetConfig(actualPath)
+	cfg, err := config.GetConfig(actualConfigPath)
 	if err != nil {
 		_, _ = fmt.Fprintf(os.Stderr, "get configuration file: %v\n", err)
 		os.Exit(1)
@@ -23,9 +23,7 @@ func main() {
 	// Start tui
 	err = tui.Core(cfg)
 	if err != nil {
-		_, _ = fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		_, _ = fmt.Fprintf(os.Stderr, "running application: %v\n", err)
 		os.Exit(1)
 	}
 }
-
-// Зупинився на 7
