@@ -42,35 +42,41 @@ func GetDownloadsPath() (string, error) {
 }
 
 // InDirSorting sorts all files in the target directory according to the provided config
-func InDirSorting(targetPath string, cfg *config.Config) (SortResult, error) {
+func InDirSorting(sortPath string, cfg *config.Config) (SortResult, error) {
 	var report SortResult
 
-	entries, err := os.ReadDir(targetPath)
+	entries, err := os.ReadDir(sortPath)
 	if err != nil {
-		return report, fmt.Errorf("reading directory %q: %w", targetPath, err)
+		return report, fmt.Errorf("reading directory %q: %w", sortPath, err)
 	}
 
 	for _, entry := range entries {
 		fileName := entry.Name()
 		if !entry.IsDir() && !strings.HasPrefix(fileName, ".") {
 			fileExt := filepath.Ext(fileName)
-			targetFolder, err := cfg.TargetFolderName(fileExt) // Get a name of save folder
+			targetPath, err := cfg.GetTargetPath(fileExt)
 			if err != nil {
 				report.Skipped = append(report.Skipped, entry.Name())
 				continue
 			}
 
-			finalPath := filepath.Join(targetPath, targetFolder) // Make a save path
+			var savePath string
+			if filepath.IsAbs(targetPath) {
+				savePath = targetPath
+			} else {
+				savePath = filepath.Join(sortPath, targetPath)
+			}
+
 			// Make the directories by path
-			if err := os.MkdirAll(finalPath, 0755); err != nil {
+			if err := os.MkdirAll(savePath, 0755); err != nil {
 				report.Errors = append(report.Errors,
-					fmt.Errorf("creating dirs by path %q: %w", finalPath, err),
+					fmt.Errorf("creating dirs by path %q: %w", savePath, err),
 				)
 				continue
 			}
 
-			oldFilePath := filepath.Join(targetPath, fileName)
-			newFilePath := filepath.Join(finalPath, fileName)
+			oldFilePath := filepath.Join(sortPath, fileName)
+			newFilePath := filepath.Join(savePath, fileName)
 
 			if err := os.Rename(oldFilePath, newFilePath); err != nil {
 				report.Errors = append(report.Errors,

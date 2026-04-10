@@ -4,6 +4,7 @@ import (
 	_ "embed"
 	"fmt"
 	"os"
+	"path/filepath"
 
 	"github.com/pelletier/go-toml/v2"
 )
@@ -11,8 +12,13 @@ import (
 //go:embed config.toml
 var defaultConfig []byte
 
+type FolderRule struct {
+	TargetPath string   `toml:"target_path"`
+	Extensions []string `toml:"extensions"`
+}
+
 type Config struct {
-	Rules         map[string][]string `toml:"rules"`
+	Rules         map[string]FolderRule `toml:"rules"`
 	InvertedRules map[string]string
 }
 
@@ -46,17 +52,19 @@ func (cfg *Config) InvertConfig() {
 	}
 	cfg.InvertedRules = make(map[string]string)
 
-	for folder, exts := range cfg.Rules {
-		for _, ext := range exts {
-			cfg.InvertedRules[ext] = folder
+	for _, folderRule := range cfg.Rules {
+		expandedPath := os.ExpandEnv(folderRule.TargetPath)
+		finalPath := filepath.Clean(expandedPath)
+		for _, ext := range folderRule.Extensions {
+			cfg.InvertedRules[ext] = finalPath
 		}
 	}
 }
 
-func (cfg *Config) TargetFolderName(fileExt string) (string, error) {
-	targetFolder, ok := cfg.InvertedRules[fileExt]
+func (cfg *Config) GetTargetPath(fileExt string) (string, error) {
+	targetPath, ok := cfg.InvertedRules[fileExt]
 	if ok {
-		return targetFolder, nil
+		return targetPath, nil
 	}
 	return "", fmt.Errorf("ext isn't in config: %s", fileExt)
 }

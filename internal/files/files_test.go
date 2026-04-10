@@ -14,9 +14,15 @@ func TestInDirSorting(t *testing.T) {
 	_ = os.WriteFile(filepath.Join(dir, "doc.pdf"), []byte("data"), 0644)
 
 	cfg := &config.Config{
-		Rules: map[string][]string{
-			"Images": {".jpg", ".png", ".bmp"},
-			"Docs":   {".pdf", ".docx", ".doc"},
+		Rules: map[string]config.FolderRule{
+			"Images": {
+				TargetPath: "Images",
+				Extensions: []string{".jpg"},
+			},
+			"Docs": {
+				TargetPath: "Docs",
+				Extensions: []string{".pdf"},
+			},
 		},
 	}
 	cfg.InvertConfig()

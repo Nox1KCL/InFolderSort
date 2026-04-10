@@ -1,3 +1,7 @@
-[rules]
-Images = [".jpg", ".png", ".gif"]
-Docs   = [".pdf", ".docx", ".txt"]
+[rules.Images]
+target_path = "$HOME/Downloads/Images"
+extensions = [".jpg", ".png", ".gif"]
+
+[rules.Documents]
+target_path = "$HOME/Downloads/Documents"
+extensions = [".pdf", ".docx", ".txt"]
