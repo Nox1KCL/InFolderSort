@@ -2,11 +2,12 @@ package config
 
 import (
 	_ "embed"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
-	
+
 	"github.com/pelletier/go-toml/v2"
 )
 
@@ -44,8 +45,7 @@ func GetConfig(path string) (*Config, error) {
 	// Inverting config once in first call
 
 	if err := cfg.Validate(); err != nil {
-		_, _ = fmt.Fprintf(os.Stderr, "invalid config: %v\n", err)
-		os.Exit(1)
+		return nil, fmt.Errorf("validating config: %w", err)
 	}
 	cfg.InvertConfig()
 
@@ -77,13 +77,22 @@ func (cfg *Config) GetTargetPath(fileExt string) (string, error) {
 
 func (cfg *Config) Validate() error {
 	seenExtensions := make(map[string]string)
-	var conflicts []string
+	var conflicts []error
 
 	for folderName, folderRule := range cfg.Rules {
 		for _, ext := range folderRule.Extensions {
-			ext = strings.ToLower(ext)
+			ext = strings.ToLower(strings.TrimSpace(ext))
+
+			if ext == "" {
+				conflicts = append(conflicts, fmt.Errorf("empty extension in %s", folderName))
+			}
+
+			if !strings.HasPrefix(ext, ".") {
+				conflicts = append(conflicts, fmt.Errorf("missing dot in extension %s in %s", ext, folderName))
+			}
+
 			if firstDebut, exists := seenExtensions[ext]; exists {
-				conflicts = append(conflicts, fmt.Sprintf("duplicate extension: %s | Seen it in %s and %s", ext, firstDebut, folderName))
+				conflicts = append(conflicts, fmt.Errorf("duplicate extension: %s | Seen it in %s and %s", ext, firstDebut, folderName))
 			} else {
 				seenExtensions[ext] = folderName
 			}
@@ -91,16 +100,16 @@ func (cfg *Config) Validate() error {
 	}
 
 	if len(conflicts) != 0 {
-		ReportConflicts(conflicts)
-		return fmt.Errorf("conflicting extensions: %q", conflicts)
+		return errors.Join(conflicts...)
+		//return fmt.Errorf("validate extensions: %q", conflicts)
 	}
 	return nil
 }
 
-func ReportConflicts(conflicts []string) {
-	fmt.Printf("Conflicts: %d\n", len(conflicts))
-	fmt.Println("Conflicting extensions:")
-	for _, conflict := range conflicts {
-		fmt.Println(conflict)
-	}
-}
+//func ReportConflicts(conflicts []string) {
+//	fmt.Printf("Conflicts: %d\n", len(conflicts))
+//	fmt.Println("Conflicting extensions:")
+//	for _, conflict := range conflicts {
+//		fmt.Println(conflict)
+//	}
+//}
