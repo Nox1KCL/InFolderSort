@@ -84,14 +84,17 @@ func (cfg *Config) Validate() error {
 
 			if ext == "" {
 				conflicts = append(conflicts, fmt.Errorf("empty extension in %s", folderName))
+				continue
 			}
 
 			if !strings.HasPrefix(ext, ".") {
 				conflicts = append(conflicts, fmt.Errorf("missing dot in extension %s in %s", ext, folderName))
+				continue
 			}
 
 			if firstDebut, exists := seenExtensions[ext]; exists {
 				conflicts = append(conflicts, fmt.Errorf("duplicate extension: %s | Seen it in %s and %s", ext, firstDebut, folderName))
+				continue
 			} else {
 				seenExtensions[ext] = folderName
 			}
@@ -100,15 +103,6 @@ func (cfg *Config) Validate() error {
 
 	if len(conflicts) != 0 {
 		return errors.Join(conflicts...)
-		//return fmt.Errorf("validate extensions: %q", conflicts)
 	}
 	return nil
 }
-
-//func ReportConflicts(conflicts []string) {
-//	fmt.Printf("Conflicts: %d\n", len(conflicts))
-//	fmt.Println("Conflicting extensions:")
-//	for _, conflict := range conflicts {
-//		fmt.Println(conflict)
-//	}
-//}

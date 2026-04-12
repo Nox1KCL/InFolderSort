@@ -88,10 +88,36 @@ func (s *Sorter) Plan() error {
 		if exist {
 			fileName = RenameFile(fileName)
 		}
+
+		sourcePath := filepath.Join(s.ScanDir, fileName)
 		destPath := filepath.Join(savePath, fileName)
-		s.Tasks = append(s.Tasks, MoveTask{fileName, s.ScanDir, destPath})
+		s.Tasks = append(s.Tasks, MoveTask{fileName, sourcePath, destPath})
 	}
 	return nil
+}
+
+func (s *Sorter) Execute() (SortResult, error) {
+	var report SortResult
+
+	for _, task := range s.Tasks {
+		if err := os.MkdirAll(task.DestPath, 0755); err != nil {
+			report.Errors = append(report.Errors,
+				fmt.Errorf("creating dirs by path %q: %w", task.DestPath, err),
+			)
+			report.Skipped = append(report.Skipped, task.FileName)
+			continue
+		}
+
+		if err := os.Rename(task.SourcePath, task.DestPath); err != nil {
+			report.Errors = append(report.Errors,
+				fmt.Errorf("moving file from %q to %q: %w", task.SourcePath, task.DestPath, err))
+			report.Skipped = append(report.Skipped, task.FileName)
+			continue
+		}
+
+		report.Moved = append(report.Moved, task.FileName)
+	}
+	return report, nil
 }
 
 func IsFileExist(path string) (bool, error) {
