@@ -85,12 +85,14 @@ func (s *Sorter) Plan() error {
 			s.Errors = append(s.Errors, err)
 			continue
 		}
+
+		finalFileName := fileName
 		if exist {
-			fileName = RenameFile(fileName)
+			finalFileName = RenameFile(fileName)
 		}
 
 		sourcePath := filepath.Join(s.ScanDir, fileName)
-		destPath := filepath.Join(savePath, fileName)
+		destPath := filepath.Join(savePath, finalFileName)
 		s.Tasks = append(s.Tasks, MoveTask{fileName, sourcePath, destPath})
 	}
 	return nil
@@ -100,9 +102,10 @@ func (s *Sorter) Execute() (SortResult, error) {
 	var report SortResult
 
 	for _, task := range s.Tasks {
-		if err := os.MkdirAll(task.DestPath, 0755); err != nil {
+		destDir := filepath.Dir(task.DestPath)
+		if err := os.MkdirAll(destDir, 0755); err != nil {
 			report.Errors = append(report.Errors,
-				fmt.Errorf("creating dirs by path %q: %w", task.DestPath, err),
+				fmt.Errorf("creating dirs by path %q: %w", destDir, err),
 			)
 			report.Skipped = append(report.Skipped, task.FileName)
 			continue
