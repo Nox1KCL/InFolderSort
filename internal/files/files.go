@@ -15,6 +15,19 @@ type SortResult struct {
 	Errors  []error
 }
 
+type MoveTask struct {
+	File       string
+	SourcePath string
+	DestPath   string
+}
+
+type Sorter struct {
+	Config    *config.Config
+	TargetDir string
+	Tasks     []MoveTask
+	Errors    []error
+}
+
 func GetHomeDir() (string, error) {
 	homeDir, err := os.UserHomeDir()
 	if err != nil {

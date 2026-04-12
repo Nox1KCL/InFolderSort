@@ -42,11 +42,10 @@ func GetConfig(path string) (*Config, error) {
 		return nil, fmt.Errorf("reading toml doc %q: %w", path, err)
 	}
 
-	// Inverting config once in first call
-
 	if err := cfg.Validate(); err != nil {
 		return nil, fmt.Errorf("validating config: %w", err)
 	}
+	// Inverting config once in first call
 	cfg.InvertConfig()
 
 	return &cfg, nil
