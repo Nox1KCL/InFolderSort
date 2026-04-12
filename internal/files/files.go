@@ -16,7 +16,7 @@ type SortResult struct {
 }
 
 type MoveTask struct {
-	File       string
+	FileName   string
 	SourcePath string
 	DestPath   string
 }
@@ -24,8 +24,34 @@ type MoveTask struct {
 type Sorter struct {
 	Config    *config.Config
 	TargetDir string
+	Files     []os.DirEntry
 	Tasks     []MoveTask
 	Errors    []error
+}
+
+func NewSorter(targetDir string, cfg *config.Config) *Sorter {
+	return &Sorter{
+		Config:    cfg,
+		TargetDir: targetDir,
+		Files:     make([]os.DirEntry, 0),
+		Tasks:     make([]MoveTask, 0),
+		Errors:    make([]error, 0),
+	}
+}
+
+func (s *Sorter) Scan() error {
+	entries, err := os.ReadDir(s.TargetDir)
+	if err != nil {
+		return fmt.Errorf("reading directory %q: %w", s.TargetDir, err)
+	}
+
+	for _, entry := range entries {
+		fileName := entry.Name()
+		if !entry.IsDir() && !strings.HasPrefix(fileName, ".") {
+			s.Files = append(s.Files, entry)
+		}
+	}
+	return nil
 }
 
 func GetHomeDir() (string, error) {
