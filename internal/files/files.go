@@ -1,10 +1,12 @@
 package files
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/Nox1KCL/InFolderSort/internal/config"
 )
@@ -22,27 +24,27 @@ type MoveTask struct {
 }
 
 type Sorter struct {
-	Config    *config.Config
-	TargetDir string
-	Files     []os.DirEntry
-	Tasks     []MoveTask
-	Errors    []error
+	Config  *config.Config
+	ScanDir string
+	Files   []os.DirEntry
+	Tasks   []MoveTask
+	Errors  []error
 }
 
 func NewSorter(targetDir string, cfg *config.Config) *Sorter {
 	return &Sorter{
-		Config:    cfg,
-		TargetDir: targetDir,
-		Files:     make([]os.DirEntry, 0),
-		Tasks:     make([]MoveTask, 0),
-		Errors:    make([]error, 0),
+		Config:  cfg,
+		ScanDir: targetDir,
+		Files:   make([]os.DirEntry, 0),
+		Tasks:   make([]MoveTask, 0),
+		Errors:  make([]error, 0),
 	}
 }
 
 func (s *Sorter) Scan() error {
-	entries, err := os.ReadDir(s.TargetDir)
+	entries, err := os.ReadDir(s.ScanDir)
 	if err != nil {
-		return fmt.Errorf("reading directory %q: %w", s.TargetDir, err)
+		return fmt.Errorf("reading directory %q: %w", s.ScanDir, err)
 	}
 
 	for _, entry := range entries {
@@ -52,6 +54,47 @@ func (s *Sorter) Scan() error {
 		}
 	}
 	return nil
+}
+
+func (s *Sorter) Plan() error {
+	for _, file := range s.Files {
+		fileName := file.Name()
+		fileExt := filepath.Ext(fileName)
+		targetPath, err := s.Config.GetTargetPath(fileExt)
+		if err != nil {
+			s.Errors = append(s.Errors, err)
+			continue
+		}
+
+		exist, err := IsFileExist(filepath.Join(targetPath, fileName))
+		if err != nil {
+			s.Errors = append(s.Errors, err)
+		}
+
+		if exist {
+			fileName = RenameFile(fileName)
+		}
+		s.Tasks = append(s.Tasks, MoveTask{fileName, s.ScanDir, targetPath})
+	}
+	return nil
+}
+
+func IsFileExist(path string) (bool, error) {
+	_, err := os.Stat(path)
+	if err == nil {
+		return true, fmt.Errorf("file %q exists", path)
+	} else if errors.Is(err, os.ErrNotExist) {
+		return false, nil
+	}
+	return false, fmt.Errorf("checking file %q: %w", path, err)
+}
+
+func RenameFile(file string) string {
+	ext := filepath.Ext(file)
+	name := strings.TrimSuffix(file, ext)
+	timestamp := time.Now().Format("20060102_150405")
+	newName := fmt.Sprintf("%s_%s%s", name, timestamp, ext)
+	return newName
 }
 
 func GetHomeDir() (string, error) {
