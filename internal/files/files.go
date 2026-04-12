@@ -57,6 +57,13 @@ func (s *Sorter) Scan() error {
 }
 
 func (s *Sorter) Plan() error {
+	if len(s.Files) == 0 {
+		return fmt.Errorf("no files found in %q", s.ScanDir)
+	}
+	if s.Config == nil {
+		return fmt.Errorf("config is empty")
+	}
+
 	for _, file := range s.Files {
 		fileName := file.Name()
 		fileExt := filepath.Ext(fileName)
@@ -66,15 +73,23 @@ func (s *Sorter) Plan() error {
 			continue
 		}
 
-		exist, err := IsFileExist(filepath.Join(targetPath, fileName))
-		if err != nil {
-			s.Errors = append(s.Errors, err)
+		var savePath string
+		if filepath.IsAbs(targetPath) {
+			savePath = targetPath
+		} else {
+			savePath = filepath.Join(s.ScanDir, targetPath)
 		}
 
+		exist, err := IsFileExist(filepath.Join(savePath, fileName))
+		if err != nil {
+			s.Errors = append(s.Errors, err)
+			continue
+		}
 		if exist {
 			fileName = RenameFile(fileName)
 		}
-		s.Tasks = append(s.Tasks, MoveTask{fileName, s.ScanDir, targetPath})
+		destPath := filepath.Join(savePath, fileName)
+		s.Tasks = append(s.Tasks, MoveTask{fileName, s.ScanDir, destPath})
 	}
 	return nil
 }
@@ -82,7 +97,7 @@ func (s *Sorter) Plan() error {
 func IsFileExist(path string) (bool, error) {
 	_, err := os.Stat(path)
 	if err == nil {
-		return true, fmt.Errorf("file %q exists", path)
+		return true, nil
 	} else if errors.Is(err, os.ErrNotExist) {
 		return false, nil
 	}
