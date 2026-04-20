@@ -16,9 +16,13 @@ type LumberConfig struct {
 	Compress   bool
 }
 
+type handlerEntry struct {
+	level   slog.Level
+	handler slog.Handler
+}
+
 type LeveledHandler struct {
-	infoHandler  slog.Handler
-	errorHandler slog.Handler
+	handlers []handlerEntry
 }
 
 func (h *LeveledHandler) Enabled(ctx context.Context, level slog.Level) bool {
@@ -26,23 +30,27 @@ func (h *LeveledHandler) Enabled(ctx context.Context, level slog.Level) bool {
 }
 
 func (h *LeveledHandler) Handle(ctx context.Context, r slog.Record) error {
-	if r.Level >= slog.LevelError {
-		return h.errorHandler.Handle(ctx, r)
+	for _, entry := range h.handlers {
+		if r.Level >= entry.level {
+			return entry.handler.Handle(ctx, r)
+		}
 	}
-	return h.infoHandler.Handle(ctx, r)
+	return nil
 }
 
 func (h *LeveledHandler) WithAttrs(attrs []slog.Attr) slog.Handler {
-	return &LeveledHandler{
-		infoHandler:  h.infoHandler.WithAttrs(attrs),
-		errorHandler: h.errorHandler.WithAttrs(attrs),
+	var newHandles []handlerEntry
+	for _, entry := range h.handlers {
+		newHandles = append(newHandles, handlerEntry{entry.level, entry.handler.WithAttrs(attrs)})
 	}
+	return &LeveledHandler{handlers: newHandles}
 }
 func (h *LeveledHandler) WithGroup(name string) slog.Handler {
-	return &LeveledHandler{
-		infoHandler:  h.infoHandler.WithGroup(name),
-		errorHandler: h.errorHandler.WithGroup(name),
+	var newHandles []handlerEntry
+	for _, entry := range h.handlers {
+		newHandles = append(newHandles, handlerEntry{entry.level, entry.handler.WithGroup(name)})
 	}
+	return &LeveledHandler{handlers: newHandles}
 }
 
 func GetLogger(cfg *LumberConfig) (*LeveledHandler, error) {
@@ -50,26 +58,30 @@ func GetLogger(cfg *LumberConfig) (*LeveledHandler, error) {
 		slog.LevelInfo:  "logs/info.log",
 		slog.LevelError: "logs/error.log",
 	}
+	absInfoPath, err := filepath.Abs(levels[slog.LevelInfo])
+	if err != nil {
+		return nil, fmt.Errorf("getting abs path %q: %w", absInfoPath, err)
+	}
+	infoHandler, err := cfg.HandlerConveyor(absInfoPath, slog.LevelInfo)
+	if err != nil {
+		return nil, fmt.Errorf("creating logger %q: %w", absInfoPath, err)
+	}
 
-	var handlers []slog.Handler
-	for level, path := range levels {
-		absPath, err := filepath.Abs(path)
-		if err != nil {
-			return nil, fmt.Errorf("getting abs path %q: %w", path, err)
-		}
-		handler, err := cfg.HandlerConveyor(absPath, level)
-		if err != nil {
-			return nil, fmt.Errorf("creating logger %q: %w", absPath, err)
-		}
-		handlers = append(handlers, handler)
-
+	absErrorPath, err := filepath.Abs(levels[slog.LevelError])
+	if err != nil {
+		return nil, fmt.Errorf("getting abs path %q: %w", absErrorPath, err)
+	}
+	errorHandler, err := cfg.HandlerConveyor(absErrorPath, slog.LevelError)
+	if err != nil {
+		return nil, fmt.Errorf("creating logger %q: %w", absErrorPath, err)
 	}
 
 	router := &LeveledHandler{
-		infoHandler:  handlers[0],
-		errorHandler: handlers[1],
+		handlers: []handlerEntry{
+			{slog.LevelInfo, infoHandler},
+			{slog.LevelError, errorHandler},
+		},
 	}
-	// TODO Доробити нормальне присвоєння логерів
 
 	return router, nil
 }
