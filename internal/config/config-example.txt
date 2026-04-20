@@ -1,0 +1,7 @@
+[rules.Name1]
+target_path = "path/to/Name1"
+extensions = [".jpg", ".png", ".gif"]
+
+[rules.Name2]
+target_path = "path/to/Name2"
+extensions = [".pdf", ".docx", ".txt"]

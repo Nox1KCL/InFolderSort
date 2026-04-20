@@ -123,24 +123,6 @@ func (s *Sorter) Execute() (SortResult, error) {
 	return report, nil
 }
 
-func IsFileExist(path string) (bool, error) {
-	_, err := os.Stat(path)
-	if err == nil {
-		return true, nil
-	} else if errors.Is(err, os.ErrNotExist) {
-		return false, nil
-	}
-	return false, fmt.Errorf("checking file %q: %w", path, err)
-}
-
-func RenameFile(file string) string {
-	ext := filepath.Ext(file)
-	name := strings.TrimSuffix(file, ext)
-	timestamp := time.Now().Format("20060102_150405")
-	newName := fmt.Sprintf("%s_%s%s", name, timestamp, ext)
-	return newName
-}
-
 func InDirSorting(scanDir string, cfg *config.Config) (SortResult, error) {
 	sorter := NewSorter(scanDir, cfg)
 	if err := sorter.Scan(); err != nil {
@@ -151,6 +133,7 @@ func InDirSorting(scanDir string, cfg *config.Config) (SortResult, error) {
 	}
 
 	if report, err := sorter.Execute(); err != nil {
+		report.Errors = append(report.Errors, sorter.Errors...)
 		return report, fmt.Errorf("executing sorting: %w", err)
 	} else {
 		return report, nil
@@ -181,4 +164,22 @@ func GetDownloadsPath() (string, error) {
 	}
 
 	return "", fmt.Errorf("downloads directory not found")
+}
+
+func IsFileExist(path string) (bool, error) {
+	_, err := os.Stat(path)
+	if err == nil {
+		return true, nil
+	} else if errors.Is(err, os.ErrNotExist) {
+		return false, nil
+	}
+	return false, fmt.Errorf("checking file %q: %w", path, err)
+}
+
+func RenameFile(file string) string {
+	ext := filepath.Ext(file)
+	name := strings.TrimSuffix(file, ext)
+	timestamp := time.Now().Format("20060102_150405")
+	newName := fmt.Sprintf("%s_%s%s", name, timestamp, ext)
+	return newName
 }
