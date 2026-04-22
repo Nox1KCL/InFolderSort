@@ -2,6 +2,7 @@ package logger
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"path/filepath"
@@ -10,10 +11,14 @@ import (
 )
 
 type LumberConfig struct {
-	MaxSize    int
-	MaxAge     int
-	MaxBackups int
-	Compress   bool
+	MaxSize    int  `toml:"max_size"`
+	MaxAge     int  `toml:"max_age"`
+	MaxBackups int  `toml:"max_backups"`
+	Compress   bool `toml:"compress"`
+}
+
+type LeveledHandler struct {
+	handlers []handlerEntry
 }
 
 type handlerEntry struct {
@@ -21,21 +26,26 @@ type handlerEntry struct {
 	handler slog.Handler
 }
 
-type LeveledHandler struct {
-	handlers []handlerEntry
-}
-
 func (h *LeveledHandler) Enabled(ctx context.Context, level slog.Level) bool {
-	return true
+	for _, entry := range h.handlers {
+		if entry.handler.Enabled(ctx, level) {
+			return true
+		}
+	}
+	return false
 }
 
 func (h *LeveledHandler) Handle(ctx context.Context, r slog.Record) error {
+	var errs []error
 	for _, entry := range h.handlers {
-		if r.Level >= entry.level {
-			return entry.handler.Handle(ctx, r)
+		if entry.handler.Enabled(ctx, r.Level) {
+			if err := entry.handler.Handle(ctx, r); err != nil {
+				errs = append(errs, err)
+			}
 		}
 	}
-	return nil
+	err := errors.Join(errs...)
+	return err
 }
 
 func (h *LeveledHandler) WithAttrs(attrs []slog.Attr) slog.Handler {
@@ -53,47 +63,33 @@ func (h *LeveledHandler) WithGroup(name string) slog.Handler {
 	return &LeveledHandler{handlers: newHandles}
 }
 
-func GetLogger(cfg *LumberConfig) (*LeveledHandler, error) {
-	levels := map[slog.Level]string{
-		slog.LevelInfo:  "logs/info.log",
-		slog.LevelError: "logs/error.log",
+func GetHandler(cfg *LumberConfig, levels map[slog.Level]string) (*LeveledHandler, error) {
+	var handlers []handlerEntry
+	for level, path := range levels {
+		handler, err := HandlerConveyor(path, level, cfg)
+		if err != nil {
+			return nil, fmt.Errorf("creating logger %q: %w", path, err)
+		}
+		handlers = append(handlers, handlerEntry{level, handler})
 	}
-	absInfoPath, err := filepath.Abs(levels[slog.LevelInfo])
+
+	logHandler := &LeveledHandler{handlers}
+
+	return logHandler, nil
+}
+
+func HandlerConveyor(filename string, level slog.Level, cfg *LumberConfig) (slog.Handler, error) {
+	absInfoPath, err := filepath.Abs(filename)
 	if err != nil {
 		return nil, fmt.Errorf("getting abs path %q: %w", absInfoPath, err)
 	}
-	infoHandler, err := cfg.HandlerConveyor(absInfoPath, slog.LevelInfo)
-	if err != nil {
-		return nil, fmt.Errorf("creating logger %q: %w", absInfoPath, err)
-	}
-
-	absErrorPath, err := filepath.Abs(levels[slog.LevelError])
-	if err != nil {
-		return nil, fmt.Errorf("getting abs path %q: %w", absErrorPath, err)
-	}
-	errorHandler, err := cfg.HandlerConveyor(absErrorPath, slog.LevelError)
-	if err != nil {
-		return nil, fmt.Errorf("creating logger %q: %w", absErrorPath, err)
-	}
-
-	router := &LeveledHandler{
-		handlers: []handlerEntry{
-			{slog.LevelInfo, infoHandler},
-			{slog.LevelError, errorHandler},
-		},
-	}
-
-	return router, nil
-}
-
-func (cfg *LumberConfig) HandlerConveyor(filename string, level slog.Level) (slog.Handler, error) {
-	handler := &lumberjack.Logger{
-		Filename:   filename,
+	logger := &lumberjack.Logger{
+		Filename:   absInfoPath,
 		MaxSize:    cfg.MaxSize,
 		MaxAge:     cfg.MaxAge,
 		MaxBackups: cfg.MaxBackups,
 		Compress:   cfg.Compress,
 	}
-	logger := slog.NewJSONHandler(handler, &slog.HandlerOptions{Level: level})
-	return logger, nil
+	handler := slog.NewJSONHandler(logger, &slog.HandlerOptions{Level: level})
+	return handler, nil
 }
