@@ -8,20 +8,22 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/Nox1KCL/InFolderSort/internal/logger"
 	"github.com/pelletier/go-toml/v2"
 )
 
 //go:embed config.toml
 var defaultConfig []byte
 
-type FolderRule struct {
-	TargetPath string   `toml:"target_path"`
-	Extensions []string `toml:"extensions"`
-}
-
 type Config struct {
 	Rules         map[string]FolderRule `toml:"rules"`
 	InvertedRules map[string]string
+	Logger        logger.LumberConfig `toml:"logger"`
+}
+
+type FolderRule struct {
+	TargetPath string   `toml:"target_path"`
+	Extensions []string `toml:"extensions"`
 }
 
 func GetConfig(path string) (*Config, error) {
